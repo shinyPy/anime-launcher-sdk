@@ -99,6 +99,7 @@ impl From<&JsonValue> for DiscordRpc {
                 Some(value) => value.as_i64(),
                 None => default.end_timestamp
             }
+
         }
     }
 }
