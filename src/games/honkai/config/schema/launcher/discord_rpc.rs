@@ -9,7 +9,9 @@ pub struct DiscordRpc {
     pub enabled: bool,
     pub title: String,
     pub subtitle: String,
-    pub icon: String
+    pub icon: String,
+    pub start_timestamp: Option<i64>,
+    pub end_timestamp: Option<i64>
 }
 
 impl From<DiscordRpc> for DiscordRpcParams {
@@ -20,7 +22,9 @@ impl From<DiscordRpc> for DiscordRpcParams {
             enabled: config.enabled,
             title: config.title,
             subtitle: config.subtitle,
-            icon: config.icon
+            icon: config.icon,
+            start_timestamp: config.start_timestamp,
+            end_timestamp: config.end_timestamp
         }
     }
 }
@@ -34,7 +38,9 @@ impl Default for DiscordRpc {
 
             title: String::from("Fighting the"),
             subtitle: String::from("Corrupted World"),
-            icon: String::from("launcher")
+            icon: String::from("launcher"),
+            start_timestamp: None,
+            end_timestamp: None
         }
     }
 }
@@ -82,6 +88,16 @@ impl From<&JsonValue> for DiscordRpc {
             icon: match value.get("icon") {
                 Some(value) => value.as_str().unwrap_or(&default.icon).to_string(),
                 None => default.icon
+            },
+
+            start_timestamp: match value.get("start_timestamp") {
+                Some(value) => value.as_i64(),
+                None => default.start_timestamp
+            },
+
+            end_timestamp: match value.get("end_timestamp") {
+                Some(value) => value.as_i64(),
+                None => default.end_timestamp
             }
         }
     }
