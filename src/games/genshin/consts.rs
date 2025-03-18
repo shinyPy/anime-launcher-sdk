@@ -24,16 +24,12 @@ pub fn launcher_dir() -> anyhow::Result<PathBuf> {
         .map(|data| format!("{data}/{FOLDER_NAME}"))
         .or_else(|_| {
             std::env::var("HOME")
-                .map(|home| {
-                    format!("{home}/.local/share/{FOLDER_NAME}")
-                })
+                .map(|home| format!("{home}/.local/share/{FOLDER_NAME}"))
         })
         .or_else(|_| {
             std::env::var("USER")
                 .or_else(|_| std::env::var("USERNAME"))
-                .map(|username| {
-                    format!("/home/{username}/.local/share/{FOLDER_NAME}")
-                })
+                .map(|username| format!("/home/{username}/.local/share/{FOLDER_NAME}"))
         })
         .map(PathBuf::from)
         .or_else(|_| {
@@ -42,7 +38,7 @@ pub fn launcher_dir() -> anyhow::Result<PathBuf> {
         })
         .map_err(|err| anyhow::anyhow!("Failed to find launcher folder: {err}"))?;
 
-    path.canonicalize().or(Ok(path))
+    path.canonicalize().or_else(|_| Ok(path))
 }
 
 /// Get launcher's cache dir path
@@ -74,8 +70,7 @@ pub fn cache_dir() -> anyhow::Result<PathBuf> {
                 .map(|current| current.join("cache"))
         })
         .map_err(|err| anyhow::anyhow!("Failed to find cache folder: {err}"))?;
-
-    path.canonicalize().or(Ok(path))
+        path.canonicalize().or_else(|_| Ok(path))
 }
 
 /// Get config file path

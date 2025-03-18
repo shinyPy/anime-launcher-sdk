@@ -38,7 +38,9 @@ impl Default for DiscordRpc {
 
             title: String::from("Fighting the"),
             subtitle: String::from("Corrupted World"),
-            icon: String::from("launcher")
+            icon: String::from("launcher"),
+            start_timestamp: None,
+            end_timestamp: None
         }
     }
 }

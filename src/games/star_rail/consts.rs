@@ -42,7 +42,7 @@ pub fn launcher_dir() -> anyhow::Result<PathBuf> {
         })
         .map_err(|err| anyhow::anyhow!("Failed to find launcher folder: {err}"))?;
 
-    path.canonicalize().or(Ok(path))
+        path.canonicalize().or_else(|_| Ok(path))
 }
 
 /// Get launcher's cache dir path
