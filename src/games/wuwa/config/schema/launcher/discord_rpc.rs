@@ -38,7 +38,9 @@ impl Default for DiscordRpc {
 
             title: String::from("Wuthering"),
             subtitle: String::from("the Waves"),
-            icon: String::from("launcher")
+            icon: String::from("launcher"),
+            start_timestamp: None,
+            end_timestamp: None
         }
     }
 }
