@@ -314,9 +314,9 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
 
     // Find d3d11.dll recursively in the libs directory
     if let Some(d3d11_src) = find_file_recursive(&info.libs_path, "d3d11.dll") {
-        let dxgi_dst = game_dir.join("dxgi.dll");
-        fs::copy(&d3d11_src, &dxgi_dst)?;
-        tracing::info!("Copied {:?} -> {:?}", d3d11_src, dxgi_dst);
+        let d3d11_dst = game_dir.join("d3d11.dll");
+        fs::copy(&d3d11_src, &d3d11_dst)?;
+        tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3d11_src, d3d11_dst);
     } else {
         tracing::error!("d3d11.dll not found anywhere in {:?}", info.libs_path);
         anyhow::bail!("d3d11.dll not found in XXMI libs package");
@@ -326,7 +326,7 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
     if let Some(d3dcompiler_src) = find_file_recursive(&info.libs_path, "d3dcompiler_47.dll") {
         let d3dcompiler_dst = game_dir.join("d3dcompiler_47.dll");
         fs::copy(&d3dcompiler_src, &d3dcompiler_dst)?;
-        tracing::info!("Copied {:?} -> {:?}", d3dcompiler_src, d3dcompiler_dst);
+        tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3dcompiler_src, d3dcompiler_dst);
     }
 
     // Find d3dx.ini recursively 
@@ -336,12 +336,12 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
     let zzmi_config_dir = d3dx_ini.parent()
         .ok_or_else(|| anyhow::anyhow!("Could not get parent directory of d3dx.ini"))?;
     
-    tracing::info!("Found ZZMI config at: {:?}", zzmi_config_dir);
+    tracing::warn!("ZZMI: Found config at: {:?}", zzmi_config_dir);
 
     // Copy d3dx.ini
     let ini_dst = game_dir.join("d3dx.ini");
     fs::copy(&d3dx_ini, &ini_dst)?;
-    tracing::info!("Copied d3dx.ini");
+    tracing::warn!("ZZMI: Copied d3dx.ini");
 
     // Symlink Core and ShaderFixes from ZZMI package
     for folder in &["Core", "ShaderFixes"] {
@@ -401,7 +401,7 @@ pub fn cleanup_mods(game_dir: &Path) -> anyhow::Result<()> {
     tracing::info!("Cleaning up ZZMI mods from {:?}", game_dir);
 
     // Remove DLLs
-    for file in &["dxgi.dll", "d3dcompiler_47.dll", "d3dx.ini"] {
+    for file in &["d3d11.dll", "dxgi.dll", "d3dcompiler_47.dll", "d3dx.ini"] {
         let path = game_dir.join(file);
         if path.exists() {
             fs::remove_file(&path)?;
