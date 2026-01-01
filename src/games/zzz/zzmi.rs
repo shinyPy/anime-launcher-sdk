@@ -334,6 +334,7 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
 
     // Skip nvapi64.dll to avoid runtime instability
     /*
+    // Find and copy nvapi64.dll (Restore for potential stability fixes)
     if let Some(nvapi_src) = find_file_recursive(&info.libs_path, "nvapi64.dll") {
         let nvapi_dst = game_dir.join("nvapi64.dll");
         fs::copy(&nvapi_src, &nvapi_dst)?;
@@ -417,16 +418,18 @@ fn patch_d3dx_ini_config(ini_path: &Path) -> anyhow::Result<()> {
 
     let content = fs::read_to_string(ini_path)?;
     
-    // patch multiple settings for stability
+    // Disable hunting mode
+    // hunting=1 -> hunting=0
     let mut new_content = content.replace("hunting=1", "hunting=0");
-    new_content = new_content.replace("calls=1", "calls=0");
-    new_content = new_content.replace("input_mask=1", "input_mask=0");
-    // also ensure overlay is off if present? hunting=0 usually does it.
+
+    // We do NOT disable calls=1 or input_mask=1 as they break initialization
+    // new_content = new_content.replace("calls=1", "calls=0");
+    // new_content = new_content.replace("input_mask=1", "input_mask=0");
     
     // If different, write back
     if content != new_content {
         fs::write(ini_path, new_content)?;
-        tracing::warn!("ZZMI: Patched d3dx.ini (hunting=0, calls=0, input_mask=0) for Linux stability");
+        tracing::warn!("ZZMI: Patched d3dx.ini (hunting=0)");
     }
 
     Ok(())
