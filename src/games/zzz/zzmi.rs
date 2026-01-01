@@ -43,6 +43,60 @@ pub fn get_default_mods_dir() -> anyhow::Result<PathBuf> {
     Ok(get_zzmi_base_dir()?.join("Mods"))
 }
 
+/// Recursively finds a file by name in a directory
+fn find_file_recursive(dir: &Path, filename: &str) -> Option<PathBuf> {
+    if !dir.is_dir() {
+        return None;
+    }
+    
+    // Check current directory
+    let direct_path = dir.join(filename);
+    if direct_path.exists() {
+        return Some(direct_path);
+    }
+    
+    // Search subdirectories
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(found) = find_file_recursive(&path, filename) {
+                    return Some(found);
+                }
+            }
+        }
+    }
+    
+    None
+}
+
+/// Recursively finds a directory by name
+fn find_dir_recursive(dir: &Path, dirname: &str) -> Option<PathBuf> {
+    if !dir.is_dir() {
+        return None;
+    }
+    
+    // Check current directory for the dirname
+    let direct_path = dir.join(dirname);
+    if direct_path.is_dir() {
+        return Some(direct_path);
+    }
+    
+    // Search subdirectories
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Some(found) = find_dir_recursive(&path, dirname) {
+                    return Some(found);
+                }
+            }
+        }
+    }
+    
+    None
+}
+
 /// Fetches the latest release info from a GitHub repo
 #[cfg(feature = "zzmi")]
 fn fetch_github_release(api_url: &str, asset_prefix: &str) -> anyhow::Result<(String, String)> {
@@ -254,43 +308,40 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
 
     // First ensure everything is downloaded
     let info = ensure_all()?;
+    
+    tracing::info!("XXMI libs at: {:?}", info.libs_path);
+    tracing::info!("ZZMI package at: {:?}", info.zzmi_path);
 
-    // Copy DLLs from XXMI libs - rename d3d11.dll to dxgi.dll to avoid DXVK conflicts
-    let d3d11_src = info.libs_path.join("d3d11.dll");
-    let dxgi_dst = game_dir.join("dxgi.dll");
-    if d3d11_src.exists() {
+    // Find d3d11.dll recursively in the libs directory
+    if let Some(d3d11_src) = find_file_recursive(&info.libs_path, "d3d11.dll") {
+        let dxgi_dst = game_dir.join("dxgi.dll");
         fs::copy(&d3d11_src, &dxgi_dst)?;
-        tracing::debug!("Copied d3d11.dll -> dxgi.dll");
+        tracing::info!("Copied {:?} -> {:?}", d3d11_src, dxgi_dst);
     } else {
-        tracing::warn!("d3d11.dll not found in {:?}", info.libs_path);
+        tracing::error!("d3d11.dll not found anywhere in {:?}", info.libs_path);
+        anyhow::bail!("d3d11.dll not found in XXMI libs package");
     }
 
-    let d3dcompiler_src = info.libs_path.join("d3dcompiler_47.dll");
-    let d3dcompiler_dst = game_dir.join("d3dcompiler_47.dll");
-    if d3dcompiler_src.exists() {
+    // Find and copy d3dcompiler_47.dll
+    if let Some(d3dcompiler_src) = find_file_recursive(&info.libs_path, "d3dcompiler_47.dll") {
+        let d3dcompiler_dst = game_dir.join("d3dcompiler_47.dll");
         fs::copy(&d3dcompiler_src, &d3dcompiler_dst)?;
-        tracing::debug!("Copied d3dcompiler_47.dll");
+        tracing::info!("Copied {:?} -> {:?}", d3dcompiler_src, d3dcompiler_dst);
     }
 
-    // Find d3dx.ini - it might be in a subdirectory like ZZMI/
-    let mut zzmi_config_dir = info.zzmi_path.clone();
-    if !zzmi_config_dir.join("d3dx.ini").exists() {
-        // Check for ZZMI subdirectory
-        let zzmi_subdir = info.zzmi_path.join("ZZMI");
-        if zzmi_subdir.join("d3dx.ini").exists() {
-            zzmi_config_dir = zzmi_subdir;
-        }
-    }
+    // Find d3dx.ini recursively 
+    let d3dx_ini = find_file_recursive(&info.zzmi_path, "d3dx.ini")
+        .ok_or_else(|| anyhow::anyhow!("d3dx.ini not found in ZZMI package"))?;
+    
+    let zzmi_config_dir = d3dx_ini.parent()
+        .ok_or_else(|| anyhow::anyhow!("Could not get parent directory of d3dx.ini"))?;
+    
+    tracing::info!("Found ZZMI config at: {:?}", zzmi_config_dir);
 
     // Copy d3dx.ini
-    let ini_src = zzmi_config_dir.join("d3dx.ini");
     let ini_dst = game_dir.join("d3dx.ini");
-    if ini_src.exists() {
-        fs::copy(&ini_src, &ini_dst)?;
-        tracing::debug!("Copied d3dx.ini");
-    } else {
-        tracing::warn!("d3dx.ini not found in {:?}", zzmi_config_dir);
-    }
+    fs::copy(&d3dx_ini, &ini_dst)?;
+    tracing::info!("Copied d3dx.ini");
 
     // Symlink Core and ShaderFixes from ZZMI package
     for folder in &["Core", "ShaderFixes"] {
