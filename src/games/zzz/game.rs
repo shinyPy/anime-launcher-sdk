@@ -111,7 +111,7 @@ pub fn run() -> anyhow::Result<()> {
 
     let run_command = features.command
         .map(|command| replace_keywords(command, &folders))
-        .unwrap_or(format!("'{}'", folders.wine.join(wine.files.wine64.clone().unwrap_or(wine.files.wine.clone())).to_string_lossy()));
+        .unwrap_or(format!("'{}'", folders.wine.join(wine.files.wine64.unwrap_or(wine.files.wine)).to_string_lossy()));
 
     bash_command += &run_command;
     bash_command += " ";
@@ -233,30 +233,9 @@ pub fn run() -> anyhow::Result<()> {
         if !overrides.is_empty() {
             overrides.push_str(";");
         }
-        overrides.push_str("d3d11=n,b;nvapi,nvapi64=n,b");
+        overrides.push_str("d3d11=n,b;nvapi,nvapi64=b");
         
         command.env("WINEDLLOVERRIDES", overrides);
-
-        // Registry hack: Disable ShowCrashDialog to prevent game suspension on non-fatal crashes
-        let wine_exe = folders.wine.join(wine.files.wine64.as_ref().unwrap_or(&wine.files.wine));
-        tracing::info!("Applying registry patch: ShowCrashDialog=0");
-        
-        let mut reg_cmd = Command::new(&wine_exe);
-        reg_cmd.env("WINEPREFIX", &folders.prefix)
-               .env("WINEARCH", "win64")
-               .args(&["reg", "add", "HKCU\\Software\\Wine\\WineDbg", "/v", "ShowCrashDialog", "/t", "REG_DWORD", "/d", "0", "/f"])
-               .stdout(Stdio::null())
-               .stderr(Stdio::null());
-        
-        // Use basic environment variables from the main command to ensure wine runs
-        // We don't need all of them, but minimal consistency helps
-        if let Some(ld_path) = command.get_envs().find(|(k, _)| *k == "LD_LIBRARY_PATH").and_then(|(_, v)| v) {
-            reg_cmd.env("LD_LIBRARY_PATH", ld_path);
-        }
-
-        if let Err(e) = reg_cmd.status() {
-            tracing::warn!("Failed to apply ShowCrashDialog patch: {}", e);
-        }
     } else {
         // Cleanup if disabled (to remove previous files)
         crate::zzz::zzmi::cleanup_mods(&folders.game)?;
