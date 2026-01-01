@@ -325,22 +325,22 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
         anyhow::bail!("d3d11.dll not found in XXMI libs package");
     }
 
-    // Skip copying d3dcompiler_47.dll on Linux/Wine - use system/wine version for better stability
-    /*
-    // Find and copy d3dcompiler_47.dll
+    // Find and copy d3dcompiler_47.dll (Required for shader compilation on Wine)
     if let Some(d3dcompiler_src) = find_file_recursive(&info.libs_path, "d3dcompiler_47.dll") {
         let d3dcompiler_dst = game_dir.join("d3dcompiler_47.dll");
         fs::copy(&d3dcompiler_src, &d3dcompiler_dst)?;
         tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3dcompiler_src, d3dcompiler_dst);
     }
-    */
 
+    // Skip nvapi64.dll on Wine - often causes silent crashes if incompatible
+    /*
     // Find and copy nvapi64.dll
     if let Some(nvapi_src) = find_file_recursive(&info.libs_path, "nvapi64.dll") {
         let nvapi_dst = game_dir.join("nvapi64.dll");
         fs::copy(&nvapi_src, &nvapi_dst)?;
         tracing::warn!("ZZMI: Copied {:?} -> {:?}", nvapi_src, nvapi_dst);
     }
+    */
 
     // Find d3dx.ini recursively 
     let d3dx_ini = find_file_recursive(&info.zzmi_path, "d3dx.ini")
