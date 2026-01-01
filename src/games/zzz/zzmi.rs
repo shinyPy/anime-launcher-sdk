@@ -304,6 +304,9 @@ pub fn ensure_all() -> anyhow::Result<ZzmiInfo> {
 /// - Symlinks user's mods folder
 #[cfg(feature = "zzmi")]
 pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
+    // First clean up any existing mod files to prevent conflicts
+    cleanup_mods(game_dir)?;
+
     tracing::info!("Preparing ZZMI mods for {:?}", game_dir);
 
     // First ensure everything is downloaded

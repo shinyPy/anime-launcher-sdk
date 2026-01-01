@@ -236,6 +236,9 @@ pub fn run() -> anyhow::Result<()> {
         overrides.push_str("winmm=n,b");
         
         command.env("WINEDLLOVERRIDES", overrides);
+    } else {
+        // Cleanup if disabled (to remove previous files)
+        crate::zzz::zzmi::cleanup_mods(&folders.game)?;
     }
 
     #[cfg(feature = "sessions")]
