@@ -227,9 +227,8 @@ pub fn run() -> anyhow::Result<()> {
         crate::zzz::zzmi::prepare_mods(&folders.game, &mods_folder)?;
         
         // Set WINEDLLOVERRIDES
-        // d3d11=n,b : User-supplied 3DMigoto (native) -> System DXVK (builtin)
-        // d3dcompiler_47=n,b : User-supplied compiler
-        command.env("WINEDLLOVERRIDES", "d3dconf,d3d11,d3dcompiler_47=n,b");
+        // d3d11,dxgi,d3dcompiler_47,nvapi,nvapi64 : Load native (3DMigoto/libs) first, then builtin (Wine/DXVK)
+        command.env("WINEDLLOVERRIDES", "d3dconf,d3d11,dxgi,d3dcompiler_47,nvapi,nvapi64=n,b");
     }
 
     #[cfg(feature = "sessions")]
