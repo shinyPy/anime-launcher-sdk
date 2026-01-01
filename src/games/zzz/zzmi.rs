@@ -317,9 +317,9 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
 
     // Find d3d11.dll recursively in the libs directory
     if let Some(d3d11_src) = find_file_recursive(&info.libs_path, "d3d11.dll") {
-        let d3d11_dst = game_dir.join("d3d11.dll");
-        fs::copy(&d3d11_src, &d3d11_dst)?;
-        tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3d11_src, d3d11_dst);
+        let dxgi_dst = game_dir.join("dxgi.dll");
+        fs::copy(&d3d11_src, &dxgi_dst)?;
+        tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3d11_src, dxgi_dst);
     } else {
         tracing::error!("d3d11.dll not found anywhere in {:?}", info.libs_path);
         anyhow::bail!("d3d11.dll not found in XXMI libs package");
