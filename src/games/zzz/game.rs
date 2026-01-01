@@ -213,18 +213,18 @@ pub fn run() -> anyhow::Result<()> {
 
     // ZZMI mod preparation
     #[cfg(feature = "zzmi")]
-    if config.game.mods.enabled && config.game.mods.zzmi_path.exists() {
+    if config.game.mods.enabled {
         tracing::info!("ZZMI mods enabled, preparing...");
         
-        // Download/update XXMI libs
-        let libs_info = crate::zzz::zzmi::ensure_xxmi_libs()?;
+        // Determine mods folder - use configured path or default
+        let mods_folder = if config.game.mods.mods_folder.as_os_str().is_empty() {
+            crate::zzz::zzmi::get_default_mods_dir()?
+        } else {
+            config.game.mods.mods_folder.clone()
+        };
         
-        // Copy DLLs and symlink folders
-        crate::zzz::zzmi::prepare_mods(
-            &folders.game,
-            &libs_info.path,
-            &config.game.mods.zzmi_path,
-        )?;
+        // Download components and prepare mods (DLLs, config, symlinks)
+        crate::zzz::zzmi::prepare_mods(&folders.game, &mods_folder)?;
         
         // Set WINEDLLOVERRIDES to load dxgi.dll as native
         // This makes Wine load our 3DMigoto DLL instead of the builtin DXVK one

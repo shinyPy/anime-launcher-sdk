@@ -1,32 +1,57 @@
 //! ZZMI (Zenless Zone Zero Model Importer) support module
 //! 
-//! Downloads and manages 3DMigoto DLLs from XXMI-Libs-Package for mod support.
+//! Downloads and manages 3DMigoto components for mod support:
+//! - XXMI-Libs-Package: DLLs (d3d11.dll, d3dcompiler_47.dll)
+//! - ZZMI-Package: Config and scripts (d3dx.ini, Core/, ShaderFixes/)
 
 use std::fs::{self, File};
-use std::io::{self, Read, Write, Cursor};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::zzz::consts;
 
 const XXMI_LIBS_API: &str = "https://api.github.com/repos/SpectrumQT/XXMI-Libs-Package/releases/latest";
+const ZZMI_PACKAGE_API: &str = "https://api.github.com/repos/SpectrumQT/ZZMI-Package/releases/latest";
 const USER_AGENT: &str = "sleepy-launcher";
 
-/// Information about the XXMI libs installation
+/// Information about the ZZMI installation
 #[derive(Debug, Clone)]
-pub struct XxmiLibsInfo {
-    pub version: String,
-    pub path: PathBuf,
+pub struct ZzmiInfo {
+    pub libs_version: String,
+    pub zzmi_version: String,
+    pub libs_path: PathBuf,
+    pub zzmi_path: PathBuf,
 }
 
-/// Fetches the latest XXMI-Libs-Package release info from GitHub
+/// Gets the base ZZMI directory in launcher folder
+pub fn get_zzmi_base_dir() -> anyhow::Result<PathBuf> {
+    Ok(consts::launcher_dir()?.join("zzmi"))
+}
+
+/// Gets the XXMI libs directory path
+pub fn get_libs_dir() -> anyhow::Result<PathBuf> {
+    Ok(get_zzmi_base_dir()?.join("xxmi-libs"))
+}
+
+/// Gets the ZZMI package directory path (d3dx.ini, Core/, ShaderFixes/)
+pub fn get_zzmi_dir() -> anyhow::Result<PathBuf> {
+    Ok(get_zzmi_base_dir()?.join("zzmi-package"))
+}
+
+/// Gets the default mods folder path
+pub fn get_default_mods_dir() -> anyhow::Result<PathBuf> {
+    Ok(get_zzmi_base_dir()?.join("Mods"))
+}
+
+/// Fetches the latest release info from a GitHub repo
 #[cfg(feature = "zzmi")]
-fn fetch_latest_release() -> anyhow::Result<(String, String)> {
+fn fetch_github_release(api_url: &str, asset_prefix: &str) -> anyhow::Result<(String, String)> {
     use reqwest::blocking::Client;
 
     let client = Client::new();
 
     let response: serde_json::Value = client
-        .get(XXMI_LIBS_API)
+        .get(api_url)
         .header("User-Agent", USER_AGENT)
         .send()?
         .json()?;
@@ -36,7 +61,6 @@ fn fetch_latest_release() -> anyhow::Result<(String, String)> {
         .ok_or_else(|| anyhow::anyhow!("No tag_name in release"))?
         .to_string();
 
-    // Find the XXMI-PACKAGE zip asset
     let assets = response["assets"]
         .as_array()
         .ok_or_else(|| anyhow::anyhow!("No assets in release"))?;
@@ -46,11 +70,11 @@ fn fetch_latest_release() -> anyhow::Result<(String, String)> {
         .find(|asset| {
             asset["name"]
                 .as_str()
-                .map(|n| n.starts_with("XXMI-PACKAGE") && n.ends_with(".zip"))
+                .map(|n| n.starts_with(asset_prefix) && n.ends_with(".zip"))
                 .unwrap_or(false)
         })
         .and_then(|asset| asset["browser_download_url"].as_str())
-        .ok_or_else(|| anyhow::anyhow!("No XXMI-PACKAGE zip found in release"))?
+        .ok_or_else(|| anyhow::anyhow!("No {} zip found in release", asset_prefix))?
         .to_string();
 
     Ok((tag_name, download_url))
@@ -61,7 +85,7 @@ fn fetch_latest_release() -> anyhow::Result<(String, String)> {
 fn download_file(url: &str, dest: &Path) -> anyhow::Result<()> {
     use reqwest::blocking::Client;
 
-    tracing::info!("Downloading XXMI libs from {}", url);
+    tracing::info!("Downloading from {}", url);
 
     let client = Client::new();
     let response = client
@@ -86,7 +110,7 @@ fn download_file(url: &str, dest: &Path) -> anyhow::Result<()> {
 fn extract_zip(zip_path: &Path, dest_dir: &Path) -> anyhow::Result<()> {
     use zip::ZipArchive;
 
-    tracing::info!("Extracting XXMI libs to {:?}", dest_dir);
+    tracing::info!("Extracting to {:?}", dest_dir);
 
     let file = File::open(zip_path)?;
     let mut archive = ZipArchive::new(file)?;
@@ -111,112 +135,178 @@ fn extract_zip(zip_path: &Path, dest_dir: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Gets the ZZMI libs directory path
-pub fn get_libs_dir() -> anyhow::Result<PathBuf> {
-    Ok(consts::launcher_dir()?.join("zzmi").join("xxmi-libs"))
+/// Saves version info to a JSON file
+#[cfg(feature = "zzmi")]
+fn save_version(dir: &Path, version: &str) -> anyhow::Result<()> {
+    let version_file = dir.join("version.json");
+    let content = serde_json::json!({ "version": version });
+    fs::write(&version_file, serde_json::to_string_pretty(&content)?)?;
+    Ok(())
 }
 
-/// Gets the installed version of XXMI libs, if any
-pub fn get_installed_version() -> anyhow::Result<Option<String>> {
-    let libs_dir = get_libs_dir()?;
-    let manifest_path = libs_dir.join("Manifest.json");
-
-    if !manifest_path.exists() {
-        return Ok(None);
+/// Reads version info from a JSON file
+fn read_version(dir: &Path) -> Option<String> {
+    let version_file = dir.join("version.json");
+    if !version_file.exists() {
+        return None;
     }
-
-    let content = fs::read_to_string(&manifest_path)?;
-    let manifest: serde_json::Value = serde_json::from_str(&content)?;
-
-    Ok(manifest["version"].as_str().map(String::from))
+    
+    let content = fs::read_to_string(&version_file).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+    json["version"].as_str().map(String::from)
 }
 
 /// Ensures XXMI libs are downloaded and up to date
-/// Returns the path to the libs directory
 #[cfg(feature = "zzmi")]
-pub fn ensure_xxmi_libs() -> anyhow::Result<XxmiLibsInfo> {
+pub fn ensure_xxmi_libs() -> anyhow::Result<(String, PathBuf)> {
     let libs_dir = get_libs_dir()?;
     
-    // Check if we need to download/update
-    let installed_version = get_installed_version().ok().flatten();
-    let (latest_version, download_url) = fetch_latest_release()?;
+    let installed_version = read_version(&libs_dir);
+    let (latest_version, download_url) = fetch_github_release(XXMI_LIBS_API, "XXMI-PACKAGE")?;
 
-    let needs_download = match &installed_version {
-        Some(v) => v != &latest_version,
-        None => true,
-    };
+    let needs_download = installed_version.as_ref() != Some(&latest_version);
 
     if needs_download {
         tracing::info!("Downloading XXMI libs {} (current: {:?})", latest_version, installed_version);
 
-        let cache_dir = consts::launcher_dir()?.join("zzmi").join("cache");
+        let cache_dir = get_zzmi_base_dir()?.join("cache");
         fs::create_dir_all(&cache_dir)?;
 
         let zip_path = cache_dir.join(format!("xxmi-libs-{}.zip", latest_version));
 
-        // Download the zip
         download_file(&download_url, &zip_path)?;
 
-        // Clear old libs and extract new ones
         if libs_dir.exists() {
             fs::remove_dir_all(&libs_dir)?;
         }
 
         extract_zip(&zip_path, &libs_dir)?;
-
-        // Clean up zip file
+        save_version(&libs_dir, &latest_version)?;
         fs::remove_file(&zip_path)?;
 
         tracing::info!("XXMI libs {} installed successfully", latest_version);
     }
 
-    Ok(XxmiLibsInfo {
-        version: latest_version,
-        path: libs_dir,
+    Ok((latest_version, libs_dir))
+}
+
+/// Ensures ZZMI package is downloaded and up to date
+#[cfg(feature = "zzmi")]
+pub fn ensure_zzmi_package() -> anyhow::Result<(String, PathBuf)> {
+    let zzmi_dir = get_zzmi_dir()?;
+    
+    let installed_version = read_version(&zzmi_dir);
+    let (latest_version, download_url) = fetch_github_release(ZZMI_PACKAGE_API, "ZZMI")?;
+
+    let needs_download = installed_version.as_ref() != Some(&latest_version);
+
+    if needs_download {
+        tracing::info!("Downloading ZZMI package {} (current: {:?})", latest_version, installed_version);
+
+        let cache_dir = get_zzmi_base_dir()?.join("cache");
+        fs::create_dir_all(&cache_dir)?;
+
+        let zip_path = cache_dir.join(format!("zzmi-package-{}.zip", latest_version));
+
+        download_file(&download_url, &zip_path)?;
+
+        if zzmi_dir.exists() {
+            fs::remove_dir_all(&zzmi_dir)?;
+        }
+
+        extract_zip(&zip_path, &zzmi_dir)?;
+        save_version(&zzmi_dir, &latest_version)?;
+        fs::remove_file(&zip_path)?;
+
+        tracing::info!("ZZMI package {} installed successfully", latest_version);
+    }
+
+    Ok((latest_version, zzmi_dir))
+}
+
+/// Ensures all ZZMI components are downloaded
+#[cfg(feature = "zzmi")]
+pub fn ensure_all() -> anyhow::Result<ZzmiInfo> {
+    let (libs_version, libs_path) = ensure_xxmi_libs()?;
+    let (zzmi_version, zzmi_path) = ensure_zzmi_package()?;
+    
+    // Create default mods folder if it doesn't exist
+    let default_mods = get_default_mods_dir()?;
+    if !default_mods.exists() {
+        fs::create_dir_all(&default_mods)?;
+    }
+
+    Ok(ZzmiInfo {
+        libs_version,
+        zzmi_version,
+        libs_path,
+        zzmi_path,
     })
 }
 
 /// Prepares ZZMI mods for game launch
 /// - Copies DLLs to game directory (d3d11.dll -> dxgi.dll for DXVK compatibility)
-/// - Symlinks ZZMI config folders
+/// - Copies/symlinks ZZMI config files
+/// - Symlinks user's mods folder
 #[cfg(feature = "zzmi")]
-pub fn prepare_mods(
-    game_dir: &Path,
-    libs_path: &Path,
-    zzmi_config_path: &Path,
-) -> anyhow::Result<()> {
+pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
     tracing::info!("Preparing ZZMI mods for {:?}", game_dir);
 
-    // Copy DLLs from XXMI libs
-    // d3d11.dll is renamed to dxgi.dll to avoid conflicts with DXVK
-    let d3d11_src = libs_path.join("d3d11.dll");
+    // First ensure everything is downloaded
+    let info = ensure_all()?;
+
+    // Copy DLLs from XXMI libs - rename d3d11.dll to dxgi.dll to avoid DXVK conflicts
+    let d3d11_src = info.libs_path.join("d3d11.dll");
     let dxgi_dst = game_dir.join("dxgi.dll");
     if d3d11_src.exists() {
         fs::copy(&d3d11_src, &dxgi_dst)?;
         tracing::debug!("Copied d3d11.dll -> dxgi.dll");
+    } else {
+        tracing::warn!("d3d11.dll not found in {:?}", info.libs_path);
     }
 
-    let d3dcompiler_src = libs_path.join("d3dcompiler_47.dll");
+    let d3dcompiler_src = info.libs_path.join("d3dcompiler_47.dll");
     let d3dcompiler_dst = game_dir.join("d3dcompiler_47.dll");
     if d3dcompiler_src.exists() {
         fs::copy(&d3dcompiler_src, &d3dcompiler_dst)?;
         tracing::debug!("Copied d3dcompiler_47.dll");
     }
 
-    // Copy d3dx.ini from ZZMI config
-    let ini_src = zzmi_config_path.join("d3dx.ini");
+    // Find d3dx.ini - it might be in a subdirectory like ZZMI/
+    let mut zzmi_config_dir = info.zzmi_path.clone();
+    if !zzmi_config_dir.join("d3dx.ini").exists() {
+        // Check for ZZMI subdirectory
+        let zzmi_subdir = info.zzmi_path.join("ZZMI");
+        if zzmi_subdir.join("d3dx.ini").exists() {
+            zzmi_config_dir = zzmi_subdir;
+        }
+    }
+
+    // Copy d3dx.ini
+    let ini_src = zzmi_config_dir.join("d3dx.ini");
     let ini_dst = game_dir.join("d3dx.ini");
     if ini_src.exists() {
         fs::copy(&ini_src, &ini_dst)?;
         tracing::debug!("Copied d3dx.ini");
+    } else {
+        tracing::warn!("d3dx.ini not found in {:?}", zzmi_config_dir);
     }
 
-    // Symlink folders from ZZMI config
-    for folder in &["Core", "ShaderFixes", "Mods"] {
-        let src = zzmi_config_path.join(folder);
+    // Symlink Core and ShaderFixes from ZZMI package
+    for folder in &["Core", "ShaderFixes"] {
+        let src = zzmi_config_dir.join(folder);
         let dst = game_dir.join(folder);
 
-        if src.is_dir() && !dst.exists() {
+        // Remove existing symlink/folder if present
+        if dst.exists() || dst.is_symlink() {
+            if dst.is_symlink() {
+                fs::remove_file(&dst)?;
+            } else if dst.is_dir() {
+                fs::remove_dir_all(&dst)?;
+            }
+        }
+
+        if src.is_dir() {
             #[cfg(unix)]
             std::os::unix::fs::symlink(&src, &dst)?;
 
@@ -226,6 +316,29 @@ pub fn prepare_mods(
             tracing::debug!("Symlinked {}", folder);
         }
     }
+
+    // Symlink user's Mods folder
+    let mods_dst = game_dir.join("Mods");
+    if mods_dst.exists() || mods_dst.is_symlink() {
+        if mods_dst.is_symlink() {
+            fs::remove_file(&mods_dst)?;
+        } else if mods_dst.is_dir() {
+            fs::remove_dir_all(&mods_dst)?;
+        }
+    }
+
+    // Create mods folder if it doesn't exist
+    if !mods_folder.exists() {
+        fs::create_dir_all(mods_folder)?;
+    }
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(mods_folder, &mods_dst)?;
+
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_dir(mods_folder, &mods_dst)?;
+
+    tracing::debug!("Symlinked Mods folder to {:?}", mods_folder);
 
     tracing::info!("ZZMI mods prepared successfully");
     Ok(())
@@ -248,7 +361,7 @@ pub fn cleanup_mods(game_dir: &Path) -> anyhow::Result<()> {
     for folder in &["Core", "ShaderFixes", "Mods"] {
         let path = game_dir.join(folder);
         if path.is_symlink() {
-            fs::remove_file(&path)?;  // Removes symlink, not target
+            fs::remove_file(&path)?;
         }
     }
 
