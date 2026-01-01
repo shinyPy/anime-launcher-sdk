@@ -353,6 +353,9 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
     fs::copy(&d3dx_ini, &ini_dst)?;
     tracing::warn!("ZZMI: Copied d3dx.ini");
 
+    // Patch d3dx.ini to disable hunting mode (crash prone on Linux)
+    patch_d3dx_ini_config(&ini_dst)?;
+
     // Symlink Core and ShaderFixes from ZZMI package
     for folder in &["Core", "ShaderFixes"] {
         let src = zzmi_config_dir.join(folder);
@@ -402,6 +405,26 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
     tracing::debug!("Symlinked Mods folder to {:?}", mods_folder);
 
     tracing::info!("ZZMI mods prepared successfully");
+    Ok(())
+}
+
+fn patch_d3dx_ini_config(ini_path: &Path) -> anyhow::Result<()> {
+    if !ini_path.exists() {
+        return Ok(());
+    }
+
+    let content = fs::read_to_string(ini_path)?;
+    
+    // Disable hunting mode
+    // hunting=1 -> hunting=0
+    let new_content = content.replace("hunting=1", "hunting=0");
+    
+    // If different, write back
+    if content != new_content {
+        fs::write(ini_path, new_content)?;
+        tracing::warn!("ZZMI: Patched d3dx.ini (hunting=0)");
+    }
+
     Ok(())
 }
 
