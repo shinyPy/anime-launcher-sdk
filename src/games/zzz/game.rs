@@ -226,9 +226,10 @@ pub fn run() -> anyhow::Result<()> {
         // Download components and prepare mods (DLLs, config, symlinks)
         crate::zzz::zzmi::prepare_mods(&folders.game, &mods_folder)?;
         
-        // Set WINEDLLOVERRIDES to load dxgi.dll as native
-        // This makes Wine load our 3DMigoto DLL instead of the builtin DXVK one
-        command.env("WINEDLLOVERRIDES", "dxgi=n,b");
+        // Set WINEDLLOVERRIDES
+        // d3d11=n,b : Required for DXVK to load (native then builtin)
+        // dxgi=n,b  : Required for 3DMigoto (renamed to dxgi) to load
+        command.env("WINEDLLOVERRIDES", "d3d11,dxgi=n,b");
     }
 
     #[cfg(feature = "sessions")]
