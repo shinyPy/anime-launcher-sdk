@@ -317,9 +317,9 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
 
     // Find d3d11.dll recursively in the libs directory
     if let Some(d3d11_src) = find_file_recursive(&info.libs_path, "d3d11.dll") {
-        let winmm_dst = game_dir.join("winmm.dll");
-        fs::copy(&d3d11_src, &winmm_dst)?;
-        tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3d11_src, winmm_dst);
+        let d3d11_dst = game_dir.join("d3d11.dll");
+        fs::copy(&d3d11_src, &d3d11_dst)?;
+        tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3d11_src, d3d11_dst);
     } else {
         tracing::error!("d3d11.dll not found anywhere in {:?}", info.libs_path);
         anyhow::bail!("d3d11.dll not found in XXMI libs package");
@@ -332,15 +332,12 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
         tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3dcompiler_src, d3dcompiler_dst);
     }
 
-    // Skip nvapi64.dll on Wine - often causes silent crashes if incompatible
-    /*
-    // Find and copy nvapi64.dll
+    // Find and copy nvapi64.dll (Restore for potential stability fixes)
     if let Some(nvapi_src) = find_file_recursive(&info.libs_path, "nvapi64.dll") {
         let nvapi_dst = game_dir.join("nvapi64.dll");
         fs::copy(&nvapi_src, &nvapi_dst)?;
         tracing::warn!("ZZMI: Copied {:?} -> {:?}", nvapi_src, nvapi_dst);
     }
-    */
 
     // Find d3dx.ini recursively 
     let d3dx_ini = find_file_recursive(&info.zzmi_path, "d3dx.ini")
