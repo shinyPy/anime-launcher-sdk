@@ -406,6 +406,17 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
 
     tracing::debug!("Symlinked Mods folder to {:?}", mods_folder);
 
+    // Disable UnityCrashHandler64.exe to prevent annoying crash dialogs that kill the game
+    let crash_handler = game_dir.join("UnityCrashHandler64.exe");
+    let crash_handler_bak = game_dir.join("UnityCrashHandler64.exe.bak");
+    if crash_handler.exists() {
+        if let Err(e) = fs::rename(&crash_handler, &crash_handler_bak) {
+            tracing::warn!("Failed to disable UnityCrashHandler64.exe: {}", e);
+        } else {
+            tracing::warn!("Disabled UnityCrashHandler64.exe (renamed to .bak)");
+        }
+    }
+
     tracing::info!("ZZMI mods prepared successfully");
     Ok(())
 }
@@ -450,6 +461,17 @@ pub fn cleanup_mods(game_dir: &Path) -> anyhow::Result<()> {
         let path = game_dir.join(folder);
         if path.is_symlink() {
             fs::remove_file(&path)?;
+        }
+    }
+
+    // Restore UnityCrashHandler64.exe if it was disabled
+    let crash_handler = game_dir.join("UnityCrashHandler64.exe");
+    let crash_handler_bak = game_dir.join("UnityCrashHandler64.exe.bak");
+    if crash_handler_bak.exists() && !crash_handler.exists() {
+        if let Err(e) = fs::rename(&crash_handler_bak, &crash_handler) {
+            tracing::warn!("Failed to restore UnityCrashHandler64.exe: {}", e);
+        } else {
+            tracing::warn!("Restored UnityCrashHandler64.exe");
         }
     }
 
