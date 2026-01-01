@@ -207,8 +207,9 @@ pub fn run() -> anyhow::Result<()> {
 
     command.envs(config.game.wine.sync.get_env_vars());
     command.envs(config.game.wine.language.get_env_vars());
-    command.envs(config.game.wine.shared_libraries.get_env_vars(wine_folder));
+    let mut shared_libs_envs = config.game.wine.shared_libraries.get_env_vars(wine_folder);
 
+    command.envs(&shared_libs_envs);
     command.envs(&config.game.environment);
 
     // ZZMI mod preparation
@@ -226,9 +227,15 @@ pub fn run() -> anyhow::Result<()> {
         // Download components and prepare mods (DLLs, config, symlinks)
         crate::zzz::zzmi::prepare_mods(&folders.game, &mods_folder)?;
         
-        // Set WINEDLLOVERRIDES
-        // d3d11,dxgi,d3dcompiler_47,nvapi,nvapi64 : Load native (3DMigoto/libs) first, then builtin (Wine/DXVK)
-        command.env("WINEDLLOVERRIDES", "d3dconf,d3d11,dxgi,d3dcompiler_47,nvapi,nvapi64=n,b");
+        // Append to WINEDLLOVERRIDES
+        // We must append to existing overrides to avoid breaking DXVK (which usually sets d3d11)
+        let mut overrides = shared_libs_envs.get("WINEDLLOVERRIDES").cloned().unwrap_or_default();
+        if !overrides.is_empty() {
+            overrides.push_str(";");
+        }
+        overrides.push_str("dxgi,d3dcompiler_47,nvapi,nvapi64=n,b");
+        
+        command.env("WINEDLLOVERRIDES", overrides);
     }
 
     #[cfg(feature = "sessions")]
