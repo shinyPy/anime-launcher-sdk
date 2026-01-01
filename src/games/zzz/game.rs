@@ -233,7 +233,7 @@ pub fn run() -> anyhow::Result<()> {
         if !overrides.is_empty() {
             overrides.push_str(";");
         }
-        overrides.push_str("winmm,d3dcompiler_47,nvapi,nvapi64=n,b");
+        overrides.push_str("winmm=n,b");
         
         command.env("WINEDLLOVERRIDES", overrides);
     }
