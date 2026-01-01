@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use crate::zzz::consts;
 
 const XXMI_LIBS_API: &str = "https://api.github.com/repos/SpectrumQT/XXMI-Libs-Package/releases/latest";
-const ZZMI_PACKAGE_API: &str = "https://api.github.com/repos/SpectrumQT/ZZMI-Package/releases/latest";
+const ZZMI_PACKAGE_API: &str = "https://api.github.com/repos/leotorrez/ZZMI-Package/releases/latest";
 const USER_AGENT: &str = "sleepy-launcher";
 
 /// Information about the ZZMI installation
