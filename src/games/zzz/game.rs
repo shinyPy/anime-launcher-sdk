@@ -233,7 +233,7 @@ pub fn run() -> anyhow::Result<()> {
         if !overrides.is_empty() {
             overrides.push_str(";");
         }
-        overrides.push_str("d3d11=n,b");
+        overrides.push_str("d3d11=n,b;nvapi,nvapi64=b");
         
         command.env("WINEDLLOVERRIDES", overrides);
 

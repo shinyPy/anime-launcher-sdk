@@ -332,15 +332,12 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
         tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3dcompiler_src, d3dcompiler_dst);
     }
 
-    // Skip nvapi64.dll to avoid runtime instability
-    /*
     // Find and copy nvapi64.dll (Restore for potential stability fixes)
     if let Some(nvapi_src) = find_file_recursive(&info.libs_path, "nvapi64.dll") {
         let nvapi_dst = game_dir.join("nvapi64.dll");
         fs::copy(&nvapi_src, &nvapi_dst)?;
         tracing::warn!("ZZMI: Copied {:?} -> {:?}", nvapi_src, nvapi_dst);
     }
-    */
 
     // Find d3dx.ini recursively 
     let d3dx_ini = find_file_recursive(&info.zzmi_path, "d3dx.ini")
