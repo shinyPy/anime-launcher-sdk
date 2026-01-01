@@ -314,9 +314,9 @@ pub fn prepare_mods(game_dir: &Path, mods_folder: &Path) -> anyhow::Result<()> {
 
     // Find d3d11.dll recursively in the libs directory
     if let Some(d3d11_src) = find_file_recursive(&info.libs_path, "d3d11.dll") {
-        let version_dst = game_dir.join("version.dll");
-        fs::copy(&d3d11_src, &version_dst)?;
-        tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3d11_src, version_dst);
+        let winmm_dst = game_dir.join("winmm.dll");
+        fs::copy(&d3d11_src, &winmm_dst)?;
+        tracing::warn!("ZZMI: Copied {:?} -> {:?}", d3d11_src, winmm_dst);
     } else {
         tracing::error!("d3d11.dll not found anywhere in {:?}", info.libs_path);
         anyhow::bail!("d3d11.dll not found in XXMI libs package");
@@ -408,7 +408,7 @@ pub fn cleanup_mods(game_dir: &Path) -> anyhow::Result<()> {
     tracing::info!("Cleaning up ZZMI mods from {:?}", game_dir);
 
     // Remove DLLs
-    for file in &["version.dll", "dxgi.dll", "d3dcompiler_47.dll", "nvapi64.dll", "d3dx.ini", "d3d11.dll"] {
+    for file in &["winmm.dll", "version.dll", "dxgi.dll", "d3dcompiler_47.dll", "nvapi64.dll", "d3dx.ini", "d3d11.dll"] {
         let path = game_dir.join(file);
         if path.exists() {
             fs::remove_file(&path)?;
