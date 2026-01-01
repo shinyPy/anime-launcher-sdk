@@ -14,3 +14,6 @@ pub mod game;
 
 #[cfg(feature = "sessions")]
 pub mod sessions;
+
+#[cfg(feature = "zzmi")]
+pub mod zzmi;

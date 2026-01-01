@@ -211,6 +211,26 @@ pub fn run() -> anyhow::Result<()> {
 
     command.envs(&config.game.environment);
 
+    // ZZMI mod preparation
+    #[cfg(feature = "zzmi")]
+    if config.game.mods.enabled && config.game.mods.zzmi_path.exists() {
+        tracing::info!("ZZMI mods enabled, preparing...");
+        
+        // Download/update XXMI libs
+        let libs_info = crate::zzz::zzmi::ensure_xxmi_libs()?;
+        
+        // Copy DLLs and symlink folders
+        crate::zzz::zzmi::prepare_mods(
+            &folders.game,
+            &libs_info.path,
+            &config.game.mods.zzmi_path,
+        )?;
+        
+        // Set WINEDLLOVERRIDES to load dxgi.dll as native
+        // This makes Wine load our 3DMigoto DLL instead of the builtin DXVK one
+        command.env("WINEDLLOVERRIDES", "dxgi=n,b");
+    }
+
     #[cfg(feature = "sessions")]
     if let Some(current) = Sessions::get_current()? {
         Sessions::apply(current, &config.game.wine.prefix)?;

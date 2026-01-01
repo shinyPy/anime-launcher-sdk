@@ -12,6 +12,7 @@ crate::config_impl_dxvk_schema!(launcher_dir);
 
 pub mod paths;
 pub mod enhancements;
+pub mod mods;
 
 pub mod prelude {
     pub use super::Wine;
@@ -19,6 +20,7 @@ pub mod prelude {
 
     pub use super::paths::Paths;
     pub use super::enhancements::Enhancements;
+    pub use super::mods::Mods;
 }
 
 use prelude::*;
@@ -30,7 +32,8 @@ pub struct Game {
     pub dxvk: Dxvk,
     pub enhancements: Enhancements,
     pub environment: HashMap<String, String>,
-    pub command: Option<String>
+    pub command: Option<String>,
+    pub mods: Mods,
 }
 
 impl Default for Game {
@@ -42,7 +45,8 @@ impl Default for Game {
             dxvk: Dxvk::default(),
             enhancements: Enhancements::default(),
             environment: HashMap::new(),
-            command: None
+            command: None,
+            mods: Mods::default(),
         }
     }
 }
@@ -98,7 +102,11 @@ impl From<&JsonValue> for Game {
                     }
                 },
                 None => default.command
-            }
+            },
+
+            mods: value.get("mods")
+                .map(Mods::from)
+                .unwrap_or(default.mods),
         }
     }
 }
