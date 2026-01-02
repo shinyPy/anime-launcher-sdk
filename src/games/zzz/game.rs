@@ -274,6 +274,31 @@ pub fn run() -> anyhow::Result<()> {
         Sessions::apply(current, &config.game.wine.prefix)?;
     }
 
+    // Clear Steam's problematic environment variables
+    // When launched from Steam as a non-Steam game, Steam injects various environment
+    // variables that conflict with Wine/DXVK/3DMigoto and cause crashes:
+    // - LD_PRELOAD: Steam overlay (gameoverlayrenderer.so) - wrong ELF class errors
+    // - STEAM_RUNTIME: Forces Steam runtime which conflicts with system Wine
+    // - SteamGameId/SteamAppId: Can confuse Wine's steam.exe stub
+    // - EnableConfiguratorSupport: Steam Input configuration
+    // - ENABLE_VK_LAYER_VALVE_*: Vulkan layers that may conflict with DXVK
+    command.env_remove("LD_PRELOAD");
+    command.env_remove("LD_LIBRARY_PATH");  // Steam might prepend its libraries
+    command.env_remove("STEAM_RUNTIME");
+    command.env_remove("STEAM_RUNTIME_LIBRARY_PATH");
+    command.env_remove("SteamGameId");
+    command.env_remove("SteamAppId");
+    command.env_remove("SteamOverlayGameId");
+    command.env_remove("STEAM_COMPAT_DATA_PATH");
+    command.env_remove("STEAM_COMPAT_CLIENT_INSTALL_PATH");
+    command.env_remove("EnableConfiguratorSupport");
+    command.env_remove("SDL_GAMECONTROLLERCONFIG");  // Steam controller config
+    // Disable Fossilize (Steam's shader cache) - conflicts with 3DMigoto shader handling
+    command.env("ENABLE_VK_LAYER_VALVE_steam_fossilize_1", "0");
+    command.env("DISABLE_VK_LAYER_VALVE_steam_fossilize_1", "1");
+
+    tracing::info!("Cleared Steam environment variables to prevent conflicts");
+
     // Run command
 
     let variables = command

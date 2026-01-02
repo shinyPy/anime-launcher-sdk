@@ -17,3 +17,6 @@ pub mod sessions;
 
 #[cfg(feature = "zzmi")]
 pub mod zzmi;
+
+#[cfg(feature = "steam")]
+pub mod steam;

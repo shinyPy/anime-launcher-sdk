@@ -33,6 +33,10 @@ md-5 = { version = "0.10", features = ["asm"], optional = true }
 reqwest = { version = "0.11", features = ["json", "blocking"], optional = true }
 zip = { version = "0.6", optional = true }
 
+# Steam integration
+steam_shortcuts_util = { version = "1.1", optional = true }
+dirs = { version = "5.0", optional = true }
+
 [features]
 genshin = ["anime-game-core/genshin"]
 star-rail = ["anime-game-core/star-rail"]
@@ -56,6 +60,7 @@ fps-unlocker = ["dep:md-5"]
 
 # ZZZ-specific features
 zzmi = ["dep:reqwest", "dep:zip"]
+steam = ["dep:steam_shortcuts_util", "dep:dirs"]
 
 all = [
     "states",
