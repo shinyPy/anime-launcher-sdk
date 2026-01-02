@@ -227,13 +227,41 @@ pub fn run() -> anyhow::Result<()> {
         // Download components and prepare mods (DLLs, config, symlinks)
         crate::zzz::zzmi::prepare_mods(&folders.game, &mods_folder)?;
         
+        // ========== Wine/DXVK Stability Environment Variables ==========
+        // These environment variables improve 3DMigoto stability on Wine/Linux
+        
+        // Enable DXVK async shader compilation to reduce stutters and prevent shader compile crashes
+        command.env("DXVK_ASYNC", "1");
+        
+        // Reduce DXVK log level to minimize overhead (none = no logging)
+        command.env("DXVK_LOG_LEVEL", "none");
+        
+        // Disable DXVK state cache to prevent conflicts with 3DMigoto's shader handling
+        // (3DMigoto has its own shader caching)
+        command.env("DXVK_STATE_CACHE", "0");
+        
+        // Disable NVIDIA API emulation that can conflict with 3DMigoto
+        command.env("DXVK_ENABLE_NVAPI", "0");
+        
+        // Use DXVK for D3D11 - critical for 3DMigoto to hook properly
+        // Without this, Wine might use its own D3D11 which breaks injection
+        command.env("PROTON_NO_D3D11", "1");
+        
+        // Disable D3D10 to prevent accidental fallback
+        command.env("PROTON_NO_D3D10", "1");
+        
+        tracing::info!("ZZMI: Applied Wine/DXVK stability environment variables");
+        
         // Append to WINEDLLOVERRIDES
         // We must append to existing overrides to avoid breaking DXVK (which usually sets d3d11)
         let mut overrides = shared_libs_envs.get("WINEDLLOVERRIDES").cloned().unwrap_or_default();
         if !overrides.is_empty() {
             overrides.push_str(";");
         }
-        overrides.push_str("d3d11=n,b;nvapi,nvapi64=b");
+        // d3d11=n,b: Load native d3d11.dll first (3DMigoto), then builtin as fallback
+        // nvapi,nvapi64=b: Use builtin Wine nvapi to avoid conflicts
+        // d3dcompiler_47=n: Use native d3dcompiler for shader compilation
+        overrides.push_str("d3d11=n,b;d3dcompiler_47=n;nvapi,nvapi64=b");
         
         command.env("WINEDLLOVERRIDES", overrides);
     } else {

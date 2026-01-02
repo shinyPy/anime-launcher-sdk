@@ -416,17 +416,50 @@ fn patch_d3dx_ini_config(ini_path: &Path) -> anyhow::Result<()> {
     }
 
     let content = fs::read_to_string(ini_path)?;
+    let mut new_content = content.clone();
     
-    // patch multiple settings for stability
-    let mut new_content = content.replace("hunting=1", "hunting=0");
+    // ========== Core Stability Patches ==========
+    // These features cause crashes or instability on Wine/Linux
+    
+    // Disable hunting mode (causes crashes when toggling with numpad)
+    new_content = new_content.replace("hunting=1", "hunting=0");
+    
+    // Disable calls/input_mask (debugging features that cause performance issues)
     new_content = new_content.replace("calls=1", "calls=0");
     new_content = new_content.replace("input_mask=1", "input_mask=0");
-    // also ensure overlay is off if present? hunting=0 usually does it.
+    
+    // Disable overlay display (can crash on Wine due to D3D state issues)
+    new_content = new_content.replace("show_overlay=1", "show_overlay=0");
+    new_content = new_content.replace("overlay=1", "overlay=0");
+    
+    // Disable marking mode (crash-prone debugging feature)
+    new_content = new_content.replace("marking_mode=1", "marking_mode=0");
+    new_content = new_content.replace("marking_mode=2", "marking_mode=0");
+    
+    // ========== Error Handling Patches ==========
+    // Allow unknown section keys to prevent crashes from mod config variations
+    new_content = new_content.replace("allow_unknown_section_keys=0", "allow_unknown_section_keys=1");
+    
+    // ========== Input/Mouse Patches ==========
+    // Disable mouse fixes that conflict with Wine's input handling
+    new_content = new_content.replace("fix_cursor=1", "fix_cursor=0");
+    new_content = new_content.replace("cursor_upscaling_override=1", "cursor_upscaling_override=0");
+    
+    // ========== Shader Cache Patches ==========
+    // Use more conservative shader handling to prevent hangs
+    new_content = new_content.replace("cache_shaders=0", "cache_shaders=1");
+    new_content = new_content.replace("export_shaders=1", "export_shaders=0");
+    new_content = new_content.replace("export_hlsl=1", "export_hlsl=0");
+    
+    // ========== Performance/Stability Patches ==========
+    // Disable features that can cause frame drops or hangs on Linux
+    new_content = new_content.replace("track_texture_updates=1", "track_texture_updates=0");
+    new_content = new_content.replace("unbuffered_errors=1", "unbuffered_errors=0");
     
     // If different, write back
     if content != new_content {
         fs::write(ini_path, new_content)?;
-        tracing::warn!("ZZMI: Patched d3dx.ini (hunting=0, calls=0, input_mask=0) for Linux stability");
+        tracing::warn!("ZZMI: Patched d3dx.ini for Linux/Wine stability (hunting=0, overlay=0, marking_mode=0, etc.)");
     }
 
     Ok(())
