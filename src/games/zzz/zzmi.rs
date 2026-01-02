@@ -456,10 +456,39 @@ fn patch_d3dx_ini_config(ini_path: &Path) -> anyhow::Result<()> {
     new_content = new_content.replace("track_texture_updates=1", "track_texture_updates=0");
     new_content = new_content.replace("unbuffered_errors=1", "unbuffered_errors=0");
     
+    // ========== Runtime Crash Prevention ==========
+    // These are critical for preventing delayed crashes (after a few minutes)
+    
+    // Disable thread naming - CRITICAL: SetThreadDescription API crashes Wine
+    // This is the most likely cause of "NtRaiseHardError" crashes after a few minutes
+    new_content = new_content.replace("force_cpu_affinity=1", "force_cpu_affinity=0");
+    
+    // Disable monitor detection (can cause crashes on multi-monitor setups)
+    new_content = new_content.replace("get_resolution_from=1", "get_resolution_from=0");
+    new_content = new_content.replace("get_resolution_from=2", "get_resolution_from=0");
+    
+    // Disable stereo (3D Vision) - not supported on Wine, can crash
+    new_content = new_content.replace("force_stereo=1", "force_stereo=0");
+    new_content = new_content.replace("automatic_stereo=1", "automatic_stereo=0");
+    
+    // Disable upscaling features that can conflict with DXVK
+    new_content = new_content.replace("upscaling=1", "upscaling=0");
+    new_content = new_content.replace("upscaling=2", "upscaling=0");
+    
+    // Disable depth buffer analysis (resource-intensive, can crash)
+    new_content = new_content.replace("analyse_options=1", "analyse_options=0");
+    
+    // Disable DX11 debug layer (crashes on Wine)
+    new_content = new_content.replace("debug_layer=1", "debug_layer=0");
+    
+    // Crashfix: Disable exception handling override (Wine handles this differently)
+    new_content = new_content.replace("crash_handling=1", "crash_handling=0");
+    new_content = new_content.replace("exception_handling=1", "exception_handling=0");
+    
     // If different, write back
     if content != new_content {
         fs::write(ini_path, new_content)?;
-        tracing::warn!("ZZMI: Patched d3dx.ini for Linux/Wine stability (hunting=0, overlay=0, marking_mode=0, etc.)");
+        tracing::warn!("ZZMI: Patched d3dx.ini for Linux/Wine stability (hunting=0, overlay=0, marking_mode=0, thread/crash fixes, etc.)");
     }
 
     Ok(())

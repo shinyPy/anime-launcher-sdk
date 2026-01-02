@@ -252,6 +252,30 @@ pub fn run() -> anyhow::Result<()> {
         
         tracing::info!("ZZMI: Applied Wine/DXVK stability environment variables");
         
+        // ========== Additional Runtime Stability Variables ==========
+        // These prevent delayed crashes that happen after a few minutes
+        
+        // Disable Wine debugging output that can cause performance issues
+        command.env("WINEDEBUG", "-all");
+        
+        // Disable Mesa's shader cache (conflicts with 3DMigoto's shader handling)
+        command.env("MESA_SHADER_CACHE_DISABLE", "true");
+        command.env("MESA_GLSL_CACHE_DISABLE", "true");
+        
+        // Disable RADV's pipeline cache (AMD GPUs - can conflict with 3DMigoto)
+        command.env("RADV_PERFTEST", "nosam");
+        
+        // Set VKD3D to be more compatible (for D3D12 games, just in case)
+        command.env("VKD3D_DISABLE_EXTENSIONS", "VK_EXT_descriptor_indexing");
+        
+        // Prevent DXVK from using problematic features
+        command.env("DXVK_CONFIG_FILE", "");  // Don't load any external DXVK config
+        
+        // Disable HDR which can cause issues with 3DMigoto hooks
+        command.env("DXVK_HDR", "0");
+        
+        tracing::info!("ZZMI: Applied additional runtime stability variables");
+        
         // Append to WINEDLLOVERRIDES
         // We must append to existing overrides to avoid breaking DXVK (which usually sets d3d11)
         let mut overrides = shared_libs_envs.get("WINEDLLOVERRIDES").cloned().unwrap_or_default();
